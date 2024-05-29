@@ -6,6 +6,9 @@ clean:
 	rm -rf result.txt
 
 run: build
-	./calculator-cli --input_file events.json --window 10
+	./calculator-cli --input_file ./events.json --window 10
 
-PHONY: build clean run
+test:
+	go test -v -cover ./...
+
+PHONY: build clean run test

@@ -1,8 +1,7 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
+	"errors"
 
 	"github.com/spf13/cobra"
 )
@@ -17,6 +16,9 @@ var (
 	window    int32
 )
 
+var ErrInvalidWindow = errors.New("window must be a positive integer")
+var ErrParseInputFile = errors.New("unable to parse input file")
+
 // rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
 	Use:   "calculator-cli",
@@ -27,38 +29,32 @@ var rootCmd = &cobra.Command{
 	flag --window.
 	The output will be printed in the stdout.
 	calculator_cli --input_file events.json --window_size 10`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("calc called")
-		fmt.Printf("reading file:%s\n", inputFile)
-		fmt.Printf("time window:%d\n", window)
-
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if window <= 0 {
-			fmt.Printf("window: %v must be a positive integer\n", window)
-			return
+			return ErrInvalidWindow
+
 		}
 
 		data, err := parseInputFile(inputFile)
 		if err != nil {
-			fmt.Printf("unable to parse input file: %s:%v\n", inputFile, err)
-			return
+			return ErrParseInputFile
 		}
 
 		simpleMovingAverage(data, window)
+		return nil
 	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
-		os.Exit(1)
-	}
+func Execute() error {
+	return rootCmd.Execute()
 }
 
 func init() {
 	// define your flags and configuration settings.
-	rootCmd.Flags().StringVar(&inputFile, "input_file", "events.json", "The input file with recored events")
+	// TODO: we'r defaulting/expecting input json to be at root level
+	rootCmd.Flags().StringVar(&inputFile, "input_file", "../events.json", "The input file with recored events")
 	rootCmd.Flags().Int32Var(&window, "window", 10, "The time window considered in the sma calculation")
 	// TODO: define if we want them to be required of if we can default.
 	// default is a good option!

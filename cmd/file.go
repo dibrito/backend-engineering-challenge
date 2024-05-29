@@ -43,10 +43,10 @@ func (t *customTime) UnmarshalJSON(data []byte) error {
 }
 
 func parseTime(timeStr string) (time.Time, error) {
-	// Layout string corresponding to the input format
+	// Layout string corresponding to the input format.
 	layout := "2006-01-02 15:04:05.999999"
 
-	// Parse the time string
+	// Parse the time string.
 	parsedTime, err := time.Parse(layout, timeStr)
 	if err != nil {
 		fmt.Println("Error parsing time:", err)
@@ -62,11 +62,13 @@ func parseInputFile(filename string) ([]event, error) {
 	var data []event
 	file, err := os.ReadFile(filename)
 	if err != nil {
+		fmt.Println(err)
 		return data, err
 	}
 
 	err = json.Unmarshal(file, &data)
 	if err != nil {
+		fmt.Println(err)
 		return data, err
 	}
 
