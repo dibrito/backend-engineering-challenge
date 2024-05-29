@@ -86,7 +86,7 @@ func findAllWindows(first, last event, window int32) map[time.Time][]time.Time {
 	// who is current?
 	// is minute from first event.
 	current := getMinute(first)
-	// while current in before last event.
+	// while current is before last event.
 	for current.Before(last.Timestamp.Time) {
 
 		if _, ok := windows[current]; !ok {

@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -29,18 +31,25 @@ var rootCmd = &cobra.Command{
 	flag --window.
 	The output will be printed in the stdout.
 	calculator_cli --input_file events.json --window_size 10`,
+	// SilenceUsage will stop displayinh usage(--help) when error from Execute.
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if window <= 0 {
 			return ErrInvalidWindow
-
 		}
 
+		now := time.Now().UTC()
 		data, err := parseInputFile(inputFile)
 		if err != nil {
 			return ErrParseInputFile
 		}
 
 		simpleMovingAverage(data, window)
+		then := time.Now()
+		diff := then.Sub(now)
+		// this is to measure successful execution time.
+		// depending on the outcome we could try to benchmark and improve if possible.
+		fmt.Printf("executed in:%.2fs\n", diff.Seconds())
 		return nil
 	},
 }
