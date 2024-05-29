@@ -13,7 +13,6 @@ type output struct {
 // simpleMovingAverage calculates the sma for a given slice of events and writes in
 // an output file. Incoming events will be ordered by timestamp.
 func simpleMovingAverage(data []event, window int32) {
-
 	// we want to calculate sma for the translation delivery time over the last X minutes.
 	// window is already defined.
 	// incoming events are already sorted.

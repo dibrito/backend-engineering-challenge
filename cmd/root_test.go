@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -12,16 +13,21 @@ import (
 )
 
 func TestRoot(t *testing.T) {
-
 	tcs := []struct {
 		name    string
 		args    []string
 		wantErr error
+		cleanup func(t *testing.T)
 	}{
 		{
+			// will use events.json file located at project root level.
 			name:    "when no flags parsed should use defaults",
 			args:    []string{},
 			wantErr: nil,
+			cleanup: func(t *testing.T) {
+				err := os.Remove("../result.txt")
+				require.NoError(t, err)
+			},
 		},
 		{
 			name:    "when unable to open input file should error",
@@ -30,7 +36,8 @@ func TestRoot(t *testing.T) {
 		},
 
 		{
-			name:    "when unable to open input file should error",
+			// will use events.json file located at project root level.
+			name:    "when invalid window should error",
 			args:    []string{"--window=-1"},
 			wantErr: ErrInvalidWindow,
 		},
@@ -39,12 +46,63 @@ func TestRoot(t *testing.T) {
 	for _, tc := range tcs {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			// Set the flags before executing the command.
 			rootCmd.SetArgs(tc.args)
-
-			// Execute the command.
 			err := rootCmd.Execute()
 			require.ErrorIs(t, err, tc.wantErr)
+			if tc.cleanup != nil {
+				tc.cleanup(t)
+			}
+		})
+	}
+}
+
+// Test regression. If this start failing, re-check your changes!
+func TestRootRegression(t *testing.T) {
+	tcs := []struct {
+		name          string
+		args          []string
+		wantErr       error
+		setup         func()
+		cleanup       func(t *testing.T)
+		checkResponse func(t *testing.T)
+	}{
+		{
+			// will use testInput.json file located at project root level.
+			name:    "when no errors should create result output",
+			args:    []string{"--input_file=./testInput.json", "--window=10"},
+			wantErr: nil,
+			cleanup: func(t *testing.T) {
+				// clean on the result file and keep the test input/result files.
+				// it's ok to remove result.txt everytime cause tests default run is sequencial.
+				err := os.Remove("../result.txt")
+				require.NoError(t, err)
+			},
+			checkResponse: func(t *testing.T) {
+				// parse got got.
+				file, err := os.Open("../result.txt")
+				require.NoError(t, err)
+				defer file.Close()
+				got := parseResult(file, t)
+
+				// parse want result.
+				file, err = os.Open("./testResult.txt")
+				require.NoError(t, err)
+				want := parseResult(file, t)
+
+				require.Equal(t, want, got)
+			},
+		},
+	}
+
+	for _, tc := range tcs {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			rootCmd.SetArgs(tc.args)
+			err := rootCmd.Execute()
+			require.NoError(t, err)
+
+			tc.checkResponse(t)
+			tc.cleanup(t)
 		})
 	}
 }
@@ -66,15 +124,19 @@ func TestRootWithHeavyLoad(t *testing.T) {
 		// executed in: ~84.409s
 		// from now we need to decide where to benchmark!
 		{
+			// will use created heavy-load.json file located at project root level.
 			name:    "when input file has 100 entries should successfuly process",
 			args:    []string{"--input_file=../heavy-load.json", "--window=5"},
 			wantErr: ErrParseInputFile,
 			setup: func() {
 				// create sample file with 100 entries
-				generateSampelFile("../heavy-load.json", 100000)
+				generateSampelFile("./heavy-load.json", 100000)
 			},
 			cleanup: func(t *testing.T) {
-				err := os.Remove("../heavy-load.json")
+				err := os.Remove("./heavy-load.json")
+				require.NoError(t, err)
+
+				err = os.Remove("../result.txt")
 				require.NoError(t, err)
 			},
 		},
@@ -97,6 +159,24 @@ func TestRootWithHeavyLoad(t *testing.T) {
 }
 
 // test utillity code:
+
+func parseResult(file *os.File, t *testing.T) []output {
+	result := []output{}
+	fileScanner := bufio.NewScanner(file)
+	fileScanner.Split(bufio.ScanLines)
+
+	for fileScanner.Scan() {
+		var line output
+		bs, err := json.Marshal([]byte(fileScanner.Text()))
+		require.NoError(t, err)
+
+		json.Unmarshal(bs, &line)
+		result = append(result, line)
+	}
+
+	return result
+}
+
 // We will create sample data to test the solution under 'heavy load'.
 
 type testEvent struct {

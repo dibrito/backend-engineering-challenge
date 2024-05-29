@@ -76,8 +76,9 @@ func parseInputFile(filename string) ([]event, error) {
 }
 
 // writeOutput write the final outputfile ordered by event timestamp.
+// result file will always live at root level.
 func writeOutput(data map[time.Time]output) error {
-	f, err := os.Create("result.txt")
+	f, err := os.Create("../result.txt")
 	if err != nil {
 		return err
 	}

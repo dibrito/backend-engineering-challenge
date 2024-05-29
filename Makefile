@@ -10,5 +10,6 @@ run: build
 
 test:
 	go test -v -cover -short ./...
+	make clean
 
 PHONY: build clean run test
