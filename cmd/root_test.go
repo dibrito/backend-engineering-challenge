@@ -12,6 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const _100K = 100000
+const _500K = 500000
+const _1M = 1000000
+
 func TestRoot(t *testing.T) {
 	tcs := []struct {
 		name    string
@@ -122,15 +126,16 @@ func TestRootWithHeavyLoad(t *testing.T) {
 	}{
 		// 100000 entries
 		// executed in: ~84.409s
+		// re-test with "most possible" iddle machine:
+		// executed in:54.73s
 		// from now we need to decide where to benchmark!
 		{
 			// will use created heavy-load.json file located at project root level.
 			name:    "when input file has 100 entries should successfuly process",
-			args:    []string{"--input_file=../heavy-load.json", "--window=5"},
+			args:    []string{"--input_file=./heavy-load.json", "--window=5"},
 			wantErr: ErrParseInputFile,
 			setup: func() {
-				// create sample file with 100 entries
-				generateSampelFile("./heavy-load.json", 100000)
+				generateSampelFile("./heavy-load.json", _1M)
 			},
 			cleanup: func(t *testing.T) {
 				err := os.Remove("./heavy-load.json")

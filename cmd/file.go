@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"bytes"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"sort"
 	"strings"
@@ -66,12 +69,29 @@ func parseInputFile(filename string) ([]event, error) {
 		return data, err
 	}
 
+	fmt.Printf("File size:%.2fMB\n", float64(len(file))/1048576.0)
 	err = json.Unmarshal(file, &data)
 	if err != nil {
 		fmt.Println(err)
 		return data, err
 	}
 
+	// Create a buffer to hold the binary data
+	var buffer bytes.Buffer
+
+	// Create a new encoder
+	encoder := gob.NewEncoder(&buffer)
+
+	// Encode the slice of structs into the buffer
+	if err := encoder.Encode(data); err != nil {
+		log.Fatalf("Failed to encode: %v", err)
+	}
+
+	// Get the byte slice from the buffer
+	byteSlice := buffer.Bytes()
+
+	// bs, _ := json.Marshal(data)
+	fmt.Printf("Struct size:%.2fMB\n", float64(len(byteSlice))/1048576.0)
 	return data, nil
 }
 

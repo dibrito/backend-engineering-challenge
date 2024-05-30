@@ -44,7 +44,8 @@ var rootCmd = &cobra.Command{
 			return ErrParseInputFile
 		}
 
-		simpleMovingAverage(data, window)
+		// simpleMovingAverage(data, window)
+		smaFIFO(data, window)
 		then := time.Now()
 		diff := then.Sub(now)
 		// this is to measure successful execution time.

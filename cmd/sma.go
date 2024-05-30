@@ -12,7 +12,7 @@ type output struct {
 
 // simpleMovingAverage calculates the sma for a given slice of events and writes in
 // an output file. Incoming events will be ordered by timestamp.
-func simpleMovingAverage(data []event, window int32) {
+func simpleMovingAverage(events []event, window int32) {
 	// we want to calculate sma for the translation delivery time over the last X minutes.
 	// window is already defined.
 	// incoming events are already sorted.
@@ -20,7 +20,7 @@ func simpleMovingAverage(data []event, window int32) {
 	// For each minute, we should get all translation events that occurred within the window time
 	// (including the current minute).
 
-	// e.g. At 18:11:
+	// First event at 18:11:
 	// window: [18:06, 18:11];
 	// Sum the delivery times of all events inside range.
 	// Divide the sum by the total number of events.
@@ -36,7 +36,7 @@ func simpleMovingAverage(data []event, window int32) {
 	// lets find all windows.
 	// TODO: rethink this logic of finding all windows, we don't need to find them all,
 	// we get the first then iterate/increase them by 1 min.
-	windows := findAllWindows(data[:1][0], data[len(data)-1:][0], window)
+	windows := findAllWindows(events[:1][0], events[len(events)-1:][0], window)
 
 	// here we iterate over all windows(ordered and asc)
 	// and will get avg delivery time for events that fit in the given window.
@@ -44,7 +44,7 @@ func simpleMovingAverage(data []event, window int32) {
 		// getAvgDeliveryTimeForWindow is itarating over ALL data, N times, where N is the lenght of windows!
 		// BAD DECISION!! but let's make it work, then we make it beautiful! ;D
 		// complexity: O(nm).
-		avg := getAvgDeliveryTimeForWindow(data, v)
+		avg := getAvgDeliveryTimeForWindow(events, v)
 		result[k] = output{
 			Date:            k,
 			AvgDeliveryTime: avg,
@@ -112,3 +112,199 @@ func getMinute(v event) time.Time {
 func getMinuteDiffRange(v time.Time, window int32) time.Time {
 	return v.Add(time.Duration(int64(time.Minute) * int64(-window))).Truncate(time.Minute)
 }
+
+// Thoughts:
+// The current issue is we running over all WINDOWS, then for each window we run over all events,
+// this is the worst case scenario.
+// One importan thing to notice based on SMA:https://en.wikipedia.org/wiki/Moving_average is:
+
+// "When calculating the next mean SMA 𝑘,next with the same sampling width 𝑘 the range from 𝑛 − 𝑘 + 2  to 𝑛 + 1 is considered.
+// A new value 𝑝 𝑛 + 1 comes into the sum and the oldest value 𝑝 𝑛 − 𝑘 + 1 drops out.
+// This simplifies the calculations by reusing the previous mean SMA 𝑘 , prev."
+
+// In resume: given our first event at: 18:11
+// the SMA for the last 5min will be:
+// SMA 11 = 10m+9m+8m+7m+6m / total in all minutes
+// SMA 12 = 11m+10m+9m+8m+7m / total in all minutes
+// SMA 13 = 12m+11m+10m+9m+8m / total in all minutes
+
+// when we say e.g. 6m,xm considere events that happened in the 6 min range or actually before!
+
+// we are always dropping the last "event on given minute",
+// as the article says:
+// "This means that the moving average filter can be computed quite cheaply on real time data with a FIFO".
+// We need to fill the FIFO compute its average on total of elements, assign to a result map, drop last, and move on,
+// sounds simple, but let see:
+
+// NOTE: code from here would be 'out of order' since we should have FIFO defined on top of the file
+// on in other file, just to show the evolution of 'thought process'!
+
+// lets define out FIFO type:
+// FIFO in Go can be obtained with a simple slice
+// to enqueue we append, to dequeue we slice of the first element.
+type FIFO struct {
+	queue []event
+}
+
+func NewFIFO() FIFO {
+	return FIFO{make([]event, 0)}
+}
+
+func (f FIFO) Enqueue(item event) []event {
+	return append(f.queue, item)
+}
+
+func (f FIFO) Dequeue() []event {
+	if len(f.queue) == 0 {
+		return f.queue
+	}
+	return f.queue[1:]
+}
+
+// smaFIFO calculates sma using FIFO to hold events and avoid iterating over all events.
+func smaFIFO(events []event, window int32) {
+	fifo := NewFIFO()
+
+	result := make(map[time.Time]output)
+
+	// we want SMA for minute
+	// identify range of minutes
+	// iterate over minutes
+	// fill the fifo, calculate and go to the next minute.
+
+	currMinute := getMinute(events[:1][0])
+	end := getMinute(events[len(events)-1:][0])
+
+	// SKIP this comment now:
+	// this will mark in each event we currently are!
+	// The whole idea here is: we can't/never iterate over events otherwise we'll get worst case scenario!
+	currEventIndex := 0
+
+	// For each minute
+	// until we reach last minute + 1min, because on the last minute: 18:23:11
+	// will still need to calculate and will fall into minute 24!
+	for currMinute.Before(end.Add(time.Minute)) || currMinute.Equal(end.Add(time.Minute)) {
+		// there will be 3 operations:
+		// ADD events,
+		// Remove events,
+		// Calculate sma.
+
+		// ADD EVENTS:
+		// we will add events to fifo that fit in the current time window.
+
+		// The problem with "add events to fifo" is we would need to iterate over all events to see if they "fit"
+		// we don't want to iterate over all events.
+		// so what we do? We iterate over events AS we ADD them to the fifo!
+
+		// When the event time is over the current minute we say "this is the last event added" and we know it's index.
+		// That's how we keep the fifo only with events that fit time
+		// and we don't iterate over all events! THIS IS THE REAL "CAT JUMP"!!
+		// While the event at the current index falls within the current minute, add it to the queue and move to the next event.
+		// ====================================================================================================================
+		// ====================================================================================================================
+
+		// REMOVE EVENTS:
+		// Remove events from the queue that are older than 10 minutes from the current minute.
+
+		// ====================================================================================================================
+		// ====================================================================================================================
+
+		// CALCULATE SMA: for all elements in fifo.
+		// ====================================================================================================================
+		// ====================================================================================================================
+
+		// ADD EVENTS: in FIFO
+		// while the event timestamp is before current minute.
+		// beawaer we can't truncate event time here to minutes: cause 18:11:06 insn't in the 18:11 range but in 18:12
+		// but currMinute is already truncated to minute!
+		// also can never be bigger the events lenght.
+		for currEventIndex < len(events) && events[currEventIndex].Timestamp.Before(currMinute) {
+			// Add it to the fifo and move to the next event.
+			fifo.queue = fifo.Enqueue(events[currEventIndex])
+			currEventIndex++
+		}
+		// after this, fifo will have only events that fit into the current minute.
+
+		// remove events that are older than the time window:10 min
+		// this is the DROP step where the FIFO will only contain events which fits
+		// into [-10min :current event min) ~ [a:b) which means, include elements from index a through b, but not including b
+		// similar to slice syntax!
+		fifo.queue = dequeueByTime(currMinute, fifo, window)
+
+		// calculate sma for current fifo.
+		avg := calculateAvg(fifo)
+
+		// add to result map.
+		result[currMinute] = output{
+			Date:            currMinute,
+			AvgDeliveryTime: avg,
+		}
+
+		// increase minute.
+		currMinute = currMinute.Add(time.Minute)
+	}
+
+	writeOutput(result)
+}
+
+// calculates avg for all elements in FIFO.
+func calculateAvg(fifo FIFO) float32 {
+	var sum float32
+	for _, event := range fifo.queue {
+		sum += float32(event.Duration)
+	}
+	// avoid division by zero!
+	if len(fifo.queue) > 0 {
+		return (sum) / float32(len(fifo.queue))
+	}
+	return 0
+}
+
+// dequeueByTime is a dequeue process that will happen as long as events inside FIFO
+// have timestamp Xmin 'smaller' then the minute that is being considere.
+func dequeueByTime(currMinute time.Time, fifo FIFO, window int32) []event {
+	// we cant iterate over fifo.queue and remove, so we iterate over a copy.
+	auxQueue := fifo.queue
+	for _, event := range auxQueue {
+		// Remove events from the queue that are older than X minutes from the current minute.
+		if currMinute.Sub(event.Timestamp.Time) > time.Minute*time.Duration(window) {
+			// remove event from queue.
+			fifo.queue = fifo.Dequeue()
+		}
+	}
+
+	return fifo.queue
+}
+
+// regression test is passing! Which is good, let now see HEAVY LOAD!
+
+// 100000 _100K entries:
+
+// smaFIFO:
+// executed in:0.76s
+
+// simpleMovingAverage(Worst case scenario)
+// executed in:54.73s
+
+// so our smaFIFO solution is ~75 times faster than simpleMovingAverage!
+// I'm already happy with that and could live with our solution,
+// let's brute force our new solution to see what happens!
+
+// smaFIFO:
+// _500K
+// executed in:3.95s
+// _1M
+// executed in:7.75s
+
+// I won't even test simpleMovingAverage! will I? ahhahah
+// test timed out after 10m0s for _500K =/
+// not worth triing _1M I'm happy enough.
+
+// smaFIFO:
+// when _1M entries:
+// File size:281.25MB
+// Struct size:19.53MB
+// executed in:8.15s
+// ~2.40 MB/s.
+
+// I'm happy but curious about memory usage! Now we can properly benchmark!
