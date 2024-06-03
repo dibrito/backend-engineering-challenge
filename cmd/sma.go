@@ -10,9 +10,9 @@ type output struct {
 	AvgDeliveryTime float32   `json:"average_delivery_time"`
 }
 
-// simpleMovingAverage calculates the sma for a given slice of events and writes in
+// SMA calculates the SMA for a given slice of events and writes in
 // an output file. Incoming events will be ordered by timestamp.
-func simpleMovingAverage(events []event, window int32) {
+func SMA(events []event, window int32) map[time.Time]output {
 	// we want to calculate sma for the translation delivery time over the last X minutes.
 	// window is already defined.
 	// incoming events are already sorted.
@@ -51,7 +51,7 @@ func simpleMovingAverage(events []event, window int32) {
 		}
 	}
 
-	writeOutput(result)
+	return result
 }
 
 // getAvgDeliveryTimeForWindow will range over events
@@ -161,8 +161,8 @@ func (f FIFO) Dequeue() []event {
 	return f.queue[1:]
 }
 
-// smaFIFO calculates sma using FIFO to hold events and avoid iterating over all events.
-func smaFIFO(events []event, window int32) {
+// FIFOSMA calculates sma using FIFO to hold events and avoid iterating over all events.
+func FIFOSMA(events []event, window int32) map[time.Time]output {
 	fifo := NewFIFO()
 
 	result := make(map[time.Time]output)
@@ -244,7 +244,7 @@ func smaFIFO(events []event, window int32) {
 		currMinute = currMinute.Add(time.Minute)
 	}
 
-	writeOutput(result)
+	return result
 }
 
 // calculates avg for all elements in FIFO.
@@ -275,36 +275,3 @@ func dequeueByTime(currMinute time.Time, fifo FIFO, window int32) []event {
 
 	return fifo.queue
 }
-
-// regression test is passing! Which is good, let now see HEAVY LOAD!
-
-// 100000 _100K entries:
-
-// smaFIFO:
-// executed in:0.76s
-
-// simpleMovingAverage(Worst case scenario)
-// executed in:54.73s
-
-// so our smaFIFO solution is ~75 times faster than simpleMovingAverage!
-// I'm already happy with that and could live with our solution,
-// let's brute force our new solution to see what happens!
-
-// smaFIFO:
-// _500K
-// executed in:3.95s
-// _1M
-// executed in:7.75s
-
-// I won't even test simpleMovingAverage! will I? ahhahah
-// test timed out after 10m0s for _500K =/
-// not worth triing _1M I'm happy enough.
-
-// smaFIFO:
-// when _1M entries:
-// File size:281.25MB
-// Struct size:19.53MB
-// executed in:8.15s
-// ~2.40 MB/s.
-
-// I'm happy but curious about memory usage! Now we can properly benchmark!

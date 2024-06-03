@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
-	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -38,19 +36,13 @@ var rootCmd = &cobra.Command{
 			return ErrInvalidWindow
 		}
 
-		now := time.Now().UTC()
 		data, err := parseInputFile(inputFile)
 		if err != nil {
 			return ErrParseInputFile
 		}
 
-		// simpleMovingAverage(data, window)
-		smaFIFO(data, window)
-		then := time.Now()
-		diff := then.Sub(now)
-		// this is to measure successful execution time.
-		// depending on the outcome we could try to benchmark and improve if possible.
-		fmt.Printf("executed in:%.2fs\n", diff.Seconds())
+		result := FIFOSMA(data, window)
+		writeOutput(result)
 		return nil
 	},
 }

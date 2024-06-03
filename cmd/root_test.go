@@ -41,6 +41,8 @@ func TestRoot(t *testing.T) {
 
 		{
 			// will use events.json file located at project root level.
+			// TODO:we should move to some /test folder to not be ambigous
+			// with possible "user's .json".
 			name:    "when invalid window should error",
 			args:    []string{"--window=-1"},
 			wantErr: ErrInvalidWindow,
@@ -120,7 +122,6 @@ func TestRootWithHeavyLoad(t *testing.T) {
 	tcs := []struct {
 		name    string
 		args    []string
-		wantErr error
 		setup   func()
 		cleanup func(t *testing.T)
 	}{
@@ -131,9 +132,8 @@ func TestRootWithHeavyLoad(t *testing.T) {
 		// from now we need to decide where to benchmark!
 		{
 			// will use created heavy-load.json file located at project root level.
-			name:    "when input file has 100 entries should successfuly process",
-			args:    []string{"--input_file=./heavy-load.json", "--window=5"},
-			wantErr: ErrParseInputFile,
+			name: "when input file has 100 entries should successfuly process",
+			args: []string{"--input_file=./heavy-load.json", "--window=5"},
 			setup: func() {
 				generateSampelFile("./heavy-load.json", _1M)
 			},
@@ -195,7 +195,7 @@ type testEvent struct {
 	Duration       int    `json:"duration"`
 }
 
-func generateRandomEvent(baseTime time.Time, id int) testEvent {
+func generateRandomTestEvent(baseTime time.Time, id int) testEvent {
 	clients := []string{"airliberty", "taxi-eats", "flyhigh", "quicktrans"}
 	languages := []string{"en", "fr", "de", "es"}
 	events := []string{"translation_delivered", "translation_requested"}
@@ -219,7 +219,7 @@ func generateSampelFile(filename string, numEntries int) {
 	events := make([]testEvent, numEntries)
 
 	for i := 0; i < numEntries; i++ {
-		events[i] = generateRandomEvent(starTime, i)
+		events[i] = generateRandomTestEvent(starTime, i)
 		// increase event timestamp over time.
 		starTime = starTime.Add(time.Minute)
 	}

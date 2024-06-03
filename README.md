@@ -72,3 +72,50 @@ calculator --input_file events.json --window_size 10
 # Future improvements(TODOs)
 
 TBD
+
+# Benchmark
+
+We Benchmarked the two solutions:
+
+* SMA: run over **ALL** events for each minute window.
+* FIFOSMA - Uses **FIFO** to main only events from the current minute.
+
+Using a sample of 100k events, we did `benchstat` for 3 metrics:
+
+* `sec/op` (seconds per operation)
+* `B/op` (bytes allocated per operation)
+* `allocs/op` (allocations* per operation) 
+
+\*allocation means 'on HEAP'
+
+Let's check the results:
+
+![alt text](image.png)
+
+### Time per Operation (`sec/op`)
+
+| Metric   | SMA-8 (sec/op)  | FIFOSMA-8 (sec/op) | Improvement                        |
+|----------|-----------------|--------------------|------------------------------------|
+| Time/op  | 54.09 ± 6%      | 0.02455 ± 3%       | `SMA-8` is ~2204 times slower      |
+
+### Memory Allocated per Operation (`B/op`)
+
+| Metric    | SMA-8 (B/op)    | FIFOSMA-8 (B/op)   | Improvement                         |
+|-----------|-----------------|--------------------|-------------------------------------|
+| Memory/op | 64.49 MiB ± 0%  | 38.20 MiB ± 0%     | `FIFOSMA-8` uses ~40.8% less memory |
+
+### Allocations per Operation (`allocs/op`)
+
+| Metric       | SMA-8 (allocs/op) | FIFOSMA-8 (allocs/op) | Improvement                             |
+|--------------|-------------------|-----------------------|-----------------------------------------|
+| Allocations/op | 105.9k ± 0%     | 30.72k ± 0%           | `FIFOSMA-8` has ~71% fewer allocations  |
+
+### Explanation:
+
+- **Time Efficiency**: `FIFOSMA-8` is approximately 2204 times faster than `SMA-8` (54.09 / 0.02455 ≈ 2204).
+- **Memory Efficiency**: `FIFOSMA-8` uses about 40.8% less memory per operation compared to `SMA-8` (64.49 MiB / 38.20 MiB ≈ 1.69, meaning `FIFOSMA-8` uses approximately 1/1.69 of the memory, which is about 59.2% of the memory used by `SMA-8`).
+- **Allocation Efficiency**: `FIFOSMA-8` has about 71% fewer allocations per operation than `SMA-8` (105.9k / 30.72k ≈ 3.45, meaning `FIFOSMA-8` has approximately 1/3.45 of the allocations, which is about 29% of the allocations used by `SMA-8`).
+
+`FIFOSMA-8` is significantly more efficient in terms of **execution time**, **memory usage**, and the **number of allocations** per operation compared to `SMA-8`.
+
+We have a point to use `FIFOSMA`! =D
