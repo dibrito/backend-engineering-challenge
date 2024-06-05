@@ -26,7 +26,7 @@ var rootCmd = &cobra.Command{
 	Long: `Calculator-cli will calculate the simple moving average(sma) from a input file in
 	in the .json format, the file should be indentified with --input_file flag.
 	The time window to be considered in the sma calculation, e.g. 10 min, should be identified by
-	flag --window.
+	flag --window_size.
 	The output will be printed in the stdout.
 	calculator_cli --input_file events.json --window_size 10`,
 	// SilenceUsage will stop displayinh usage(--help) when error from Execute.
@@ -44,8 +44,7 @@ var rootCmd = &cobra.Command{
 		// result := FIFOSMA(data, window)
 		result := FIFOSMAMinified(data, window)
 		// result := BuffFIFOSMA(data, window)
-		writeOutput(result)
-		return nil
+		return writeOutput(result)
 	},
 }
 
@@ -59,7 +58,7 @@ func init() {
 	// define your flags and configuration settings.
 	// TODO: we'r defaulting/expecting input json to be at root level
 	rootCmd.Flags().StringVar(&inputFile, "input_file", "../events.json", "The input file with recored events")
-	rootCmd.Flags().Int32Var(&window, "window", 10, "The time window considered in the sma calculation")
+	rootCmd.Flags().Int32Var(&window, "window_size", 10, "The time window considered in the sma calculation")
 	// TODO: define if we want them to be required of if we can default.
 	// default is a good option!
 }

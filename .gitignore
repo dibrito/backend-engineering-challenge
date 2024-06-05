@@ -1,4 +1,5 @@
 calculator-cli
 .vscode
 *.bench
+*.txt
 bench-100K.json

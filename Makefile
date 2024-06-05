@@ -8,11 +8,10 @@ clean:
 	rm -rf *.pprof
 
 run: build
-	./calculator-cli --input_file ./events.json --window 10
+	./calculator-cli --input_file ./events.json --window_size 10
 
-test:
+test: clean
 	go test -v -cover -short ./... -count=1
-	make clean
 
 benchsma:
 	go test ./cmd -run=^$$ -benchmem -bench=^BenchmarkSMA$$ -count=10 > sma.bench

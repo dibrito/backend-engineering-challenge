@@ -66,7 +66,7 @@ make build
 calculate with:
 
 ```bash
-calculator --input_file events.json --window_size 10
+./calculator-cli --input_file events.json --window_size 10
 ```
 
 # Future improvements(TODOs)

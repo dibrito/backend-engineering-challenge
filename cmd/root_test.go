@@ -29,7 +29,7 @@ func TestRoot(t *testing.T) {
 			args:    []string{},
 			wantErr: nil,
 			cleanup: func(t *testing.T) {
-				err := os.Remove("../result.txt")
+				err := os.Remove("./result.txt")
 				require.NoError(t, err)
 			},
 		},
@@ -44,7 +44,7 @@ func TestRoot(t *testing.T) {
 			// TODO:we should move to some /test folder to not be ambigous
 			// with possible "user's .json".
 			name:    "when invalid window should error",
-			args:    []string{"--window=-1"},
+			args:    []string{"--window_size=-1"},
 			wantErr: ErrInvalidWindow,
 		},
 	}
@@ -75,17 +75,17 @@ func TestRootRegression(t *testing.T) {
 		{
 			// will use testInput.json file located at project root level.
 			name:    "when no errors should create result output",
-			args:    []string{"--input_file=./testInput.json", "--window=10"},
+			args:    []string{"--input_file=./testInput.json", "--window_size=10"},
 			wantErr: nil,
 			cleanup: func(t *testing.T) {
 				// clean on the result file and keep the test input/result files.
 				// it's ok to remove result.txt everytime cause tests default run is sequencial.
-				err := os.Remove("../result.txt")
+				err := os.Remove("./result.txt")
 				require.NoError(t, err)
 			},
 			checkResponse: func(t *testing.T) {
 				// parse got got.
-				file, err := os.Open("../result.txt")
+				file, err := os.Open("./result.txt")
 				require.NoError(t, err)
 				defer file.Close()
 				got := parseResult(file, t)
@@ -133,7 +133,7 @@ func TestRootWithHeavyLoad(t *testing.T) {
 		{
 			// will use created heavy-load.json file located at project root level.
 			name: "when input file has 100 entries should successfuly process",
-			args: []string{"--input_file=./heavy-load.json", "--window=5"},
+			args: []string{"--input_file=./heavy-load.json", "--window_size=5"},
 			setup: func() {
 				generateSampelFile("./heavy-load.json", _1M)
 			},
@@ -141,7 +141,7 @@ func TestRootWithHeavyLoad(t *testing.T) {
 				err := os.Remove("./heavy-load.json")
 				require.NoError(t, err)
 
-				err = os.Remove("../result.txt")
+				err = os.Remove("./result.txt")
 				require.NoError(t, err)
 			},
 		},
