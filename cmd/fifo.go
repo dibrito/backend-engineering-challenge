@@ -1,50 +1,55 @@
 package cmd
 
-// BufFIFO represents a circular FIFO.
-type BufFIFO struct {
+import "time"
+
+// FIFO define our FIFO type.
+type FIFO struct {
 	queue []event
-	head  int
-	tail  int
-	size  int
-	cap   int
 }
 
-func NewBufFIFO(capacity int) *BufFIFO {
-	if capacity < 16 {
-		capacity = 16 //min capacity to avoid frequent resizes.
-	}
-	return &BufFIFO{
-		queue: make([]event, capacity),
-		head:  0,
-		tail:  0,
-		size:  0,
-		cap:   capacity,
-	}
+// NewFIFO creates a new FIFO.
+func NewFIFO() *FIFO {
+	return &FIFO{make([]event, 0)}
 }
 
-func (f *BufFIFO) Enqueue(item event) {
-	if f.size == f.cap {
-		// Expand the buffer if needed
-		newCap := f.cap * 2
-		newQueue := make([]event, newCap)
-		copy(newQueue, f.queue[f.head:])
-		copy(newQueue[f.cap-f.head:], f.queue[:f.tail])
-		f.queue = newQueue
-		f.head = 0
-		f.tail = f.size
-		f.cap = newCap
-	}
-
-	f.queue[f.tail] = item
-	f.tail = (f.tail + 1) % f.cap
-	f.size++
+// Enqueue add an item to FIFO.
+func (f *FIFO) Enqueue(item event) {
+	f.queue = append(f.queue, item)
 }
 
-func (f *BufFIFO) Dequeue() {
-	if f.size == 0 {
+// Dequeue remove 'head' of FIFO.
+func (f *FIFO) Dequeue() {
+	if len(f.queue) == 0 {
 		return
 	}
-	f.head = (f.head + 1) % f.cap
-	f.size--
-	return
+	f.queue = f.queue[1:]
+}
+
+// dequeueByTime is a dequeue process that will happen as long as events inside FIFO
+// have timestamp Xmin 'smaller' then the minute that is being considere.
+func dequeueByTime(currMinute time.Time, fifo *FIFO, window int32) []event {
+	// we cant iterate over fifo.queue and remove, so we iterate over a copy.
+	auxQueue := fifo.queue
+	for _, event := range auxQueue {
+		// Remove events from the queue that are older than X minutes from the current minute.
+		if currMinute.Sub(event.Timestamp.Time) > time.Minute*time.Duration(window) {
+			// remove event from queue.
+			fifo.Dequeue()
+		}
+	}
+
+	return fifo.queue
+}
+
+// calculates avg for all elements in FIFO.
+func calculateAvg(fifo *FIFO) float32 {
+	var sum float32
+	for _, event := range fifo.queue {
+		sum += float32(event.Duration)
+	}
+	// avoid division by zero!
+	if len(fifo.queue) > 0 {
+		return (sum) / float32(len(fifo.queue))
+	}
+	return 0
 }

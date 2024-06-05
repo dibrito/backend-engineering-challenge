@@ -141,26 +141,9 @@ func getMinuteDiffRange(v time.Time, window int32) time.Time {
 
 // lets define out FIFO type:
 // FIFO in Go can be obtained with a simple slice
-// to enqueue we append, to dequeue we slice of the first element.
-type FIFO struct {
-	queue []event
-}
+// to enqueue we append, to dequeue we slice of the first element. Check fifo.go file.
 
-func NewFIFO() *FIFO {
-	return &FIFO{make([]event, 0)}
-}
-
-func (f *FIFO) Enqueue(item event) {
-	f.queue = append(f.queue, item)
-}
-
-func (f *FIFO) Dequeue() {
-	if len(f.queue) == 0 {
-		return
-	}
-	f.queue = f.queue[1:]
-}
-
+// This was our first FIFO implementation.
 // FIFOSMA calculates sma using FIFO to hold events and avoid iterating over all events.
 func FIFOSMA(events []event, window int32) map[time.Time]output {
 	fifo := NewFIFO()
@@ -282,7 +265,7 @@ func BuffFIFOSMA(events []event, window int32) map[time.Time]output {
 	// fifo := NewBufFIFO(100)
 	// after the cpu and mem profiling we come up with at least half of events!
 	// didn't work! lets try 10% 25% of events!
-	fifo := NewBufFIFO((25 * len(events)) / 100)
+	fifo := NewBufFIFO(16)
 
 	currEventIndex := 0
 
@@ -301,57 +284,4 @@ func BuffFIFOSMA(events []event, window int32) map[time.Time]output {
 		currMinute = currMinute.Add(time.Minute)
 	}
 	return result
-}
-
-// calculates avg for all elements in FIFO.
-func calculateAvg(fifo *FIFO) float32 {
-	var sum float32
-	for _, event := range fifo.queue {
-		sum += float32(event.Duration)
-	}
-	// avoid division by zero!
-	if len(fifo.queue) > 0 {
-		return (sum) / float32(len(fifo.queue))
-	}
-	return 0
-}
-
-func calculateAvgFromBuffFIFO(fifo *BufFIFO) float32 {
-	var sum float32
-	for _, event := range fifo.queue {
-		sum += float32(event.Duration)
-	}
-	// avoid division by zero!
-	if len(fifo.queue) > 0 {
-		return (sum) / float32(len(fifo.queue))
-	}
-	return 0
-}
-
-// dequeueByTime is a dequeue process that will happen as long as events inside FIFO
-// have timestamp Xmin 'smaller' then the minute that is being considere.
-func dequeueByTime(currMinute time.Time, fifo *FIFO, window int32) []event {
-	// we cant iterate over fifo.queue and remove, so we iterate over a copy.
-	auxQueue := fifo.queue
-	for _, event := range auxQueue {
-		// Remove events from the queue that are older than X minutes from the current minute.
-		if currMinute.Sub(event.Timestamp.Time) > time.Minute*time.Duration(window) {
-			// remove event from queue.
-			fifo.Dequeue()
-		}
-	}
-
-	return fifo.queue
-}
-
-func (fifo *BufFIFO) dequeueBuffFIFOByTime(currMinute time.Time, window int32) {
-	// we cant iterate over fifo.queue and remove, so we iterate over a copy.
-	auxQueue := fifo.queue
-	for _, event := range auxQueue {
-		// Remove events from the queue that are older than X minutes from the current minute.
-		if currMinute.Sub(event.Timestamp.Time) > time.Minute*time.Duration(window) {
-			// remove event from queue.
-			fifo.Dequeue()
-		}
-	}
 }
