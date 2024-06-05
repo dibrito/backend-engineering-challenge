@@ -71,7 +71,14 @@ calculator --input_file events.json --window_size 10
 
 # Future improvements(TODOs)
 
-TBD
+- improve 'Installing' section , we should make CLI avaiable with go install cmd
+- add more test coverage e.g. file.go, fifo.go
+- better handle test file creationg and deletion, a lot of "../", we could mock files maybe with: "github.com/spf13/afero"
+- remove the default events.json used for test that gets ambigous with default CLI file "../events.json"
+- Think on a solution that uses go routines?
+- And at the end we are never using the previous AVG(which is the whole point of SMA), and we always calculating a new
+- We could add a option on which implementatio we want to use: SMA, SMAFIFO, SMABuffFIFO
+- TBD
 
 # Benchmark
 
