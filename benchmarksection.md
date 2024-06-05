@@ -240,8 +240,8 @@ I'm done with profiling!!
 After implement TestAllSMAs in sms_test.go to check that all funcs had the same result,
 we found that our previous:
 
-* dequeueBuffFIFOByTime
-* calculateAvgFromBuffFIFO
+* dequeueBuffFIFOByTime [here](https://github.com/Unbabel/backend-engineering-challenge/commit/ce04ec3f2633bd37d641144e1c43ca8ecf8cd6aa#diff-5889f471abae4ad0bfc0ffa716462b65c93b9401b9ca66d941558053bdcea598R347)
+* calculateAvgFromBuffFIFO [here](https://github.com/Unbabel/backend-engineering-challenge/commit/ce04ec3f2633bd37d641144e1c43ca8ecf8cd6aa#diff-5889f471abae4ad0bfc0ffa716462b65c93b9401b9ca66d941558053bdcea598R319)
 
 Were still considering the old linear slice, and not the circular one.
 After the fix all SMA funcs return the same result!
