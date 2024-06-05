@@ -27,10 +27,10 @@ func TestFIFOEnqueue(t *testing.T) {
 	require.NotNil(t, fifo)
 	require.Len(t, fifo.queue, 0)
 
-	fifo.queue = fifo.Enqueue(e)
+	fifo.Enqueue(e)
 	require.Len(t, fifo.queue, 1)
 
-	fifo.queue = fifo.Enqueue(e)
+	fifo.Enqueue(e)
 	require.Len(t, fifo.queue, 2)
 }
 
@@ -39,10 +39,10 @@ func TestFIFODequeueNotEmpty(t *testing.T) {
 	require.NotNil(t, fifo)
 	require.Len(t, fifo.queue, 0)
 
-	fifo.queue = fifo.Enqueue(e)
+	fifo.Enqueue(e)
 
 	require.Len(t, fifo.queue, 1)
-	fifo.queue = fifo.Dequeue()
+	fifo.Dequeue()
 	require.Len(t, fifo.queue, 0)
 }
 
@@ -51,7 +51,7 @@ func TestFIFODequeueEmpty(t *testing.T) {
 	require.NotNil(t, fifo)
 	require.Len(t, fifo.queue, 0)
 
-	fifo.queue = fifo.Dequeue()
+	fifo.Dequeue()
 	require.Len(t, fifo.queue, 0)
 }
 
@@ -119,7 +119,21 @@ func BenchmarkFIFOSMA(b *testing.B) {
 	b.ResetTimer()
 	// execute code to benchmark here:
 	for i := 0; i < b.N; i++ {
-		FIFOSMA(events, window)
+		FIFOSMAMinified(events, window)
+	}
+	result = r
+}
+
+func BenchmarkFIFOSMAMapFix(b *testing.B) {
+	// local sink.
+	var r map[time.Time]output
+	events := generateEventsArray(b, _100K)
+	window := int32(10)
+	// It's important to not record any setup that is required to run your benchmark.
+	b.ResetTimer()
+	// execute code to benchmark here:
+	for i := 0; i < b.N; i++ {
+		FIFOSMAMinifiedMapFix(events, window)
 	}
 	result = r
 }

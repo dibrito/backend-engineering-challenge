@@ -146,19 +146,19 @@ type FIFO struct {
 	queue []event
 }
 
-func NewFIFO() FIFO {
-	return FIFO{make([]event, 0)}
+func NewFIFO() *FIFO {
+	return &FIFO{make([]event, 0)}
 }
 
-func (f FIFO) Enqueue(item event) []event {
-	return append(f.queue, item)
+func (f *FIFO) Enqueue(item event) {
+	f.queue = append(f.queue, item)
 }
 
-func (f FIFO) Dequeue() []event {
+func (f *FIFO) Dequeue() {
 	if len(f.queue) == 0 {
-		return f.queue
+		return
 	}
-	return f.queue[1:]
+	f.queue = f.queue[1:]
 }
 
 // FIFOSMA calculates sma using FIFO to hold events and avoid iterating over all events.
@@ -220,7 +220,7 @@ func FIFOSMA(events []event, window int32) map[time.Time]output {
 		// also can never be bigger the events lenght.
 		for currEventIndex < len(events) && events[currEventIndex].Timestamp.Before(currMinute) {
 			// Add it to the fifo and move to the next event.
-			fifo.queue = fifo.Enqueue(events[currEventIndex])
+			fifo.Enqueue(events[currEventIndex])
 			currEventIndex++
 		}
 		// after this, fifo will have only events that fit into the current minute.
@@ -247,8 +247,83 @@ func FIFOSMA(events []event, window int32) map[time.Time]output {
 	return result
 }
 
+// FIFOSMA without comments to make profiling visibility better to understand.
+func FIFOSMAMinified(events []event, window int32) map[time.Time]output {
+	fifo := NewFIFO()
+	result := make(map[time.Time]output)
+	currMinute := getMinute(events[:1][0])
+	end := getMinute(events[len(events)-1:][0])
+
+	currEventIndex := 0
+
+	for currMinute.Before(end.Add(time.Minute)) || currMinute.Equal(end.Add(time.Minute)) {
+		for currEventIndex < len(events) && events[currEventIndex].Timestamp.Before(currMinute) {
+			fifo.Enqueue(events[currEventIndex])
+			currEventIndex++
+		}
+		fifo.queue = dequeueByTime(currMinute, fifo, window)
+		avg := calculateAvg(fifo)
+		result[currMinute] = output{
+			Date:            currMinute,
+			AvgDeliveryTime: avg,
+		}
+		currMinute = currMinute.Add(time.Minute)
+	}
+	return result
+}
+
+func FIFOSMAMinifiedMapFix(events []event, window int32) map[time.Time]output {
+	fifo := NewFIFO()
+	currMinute := getMinute(events[:1][0])
+	end := getMinute(events[len(events)-1:][0])
+	totalMinutes := int(end.Sub(currMinute) + 1)
+	result := make(map[time.Time]output, totalMinutes)
+
+	currEventIndex := 0
+
+	for currMinute.Before(end.Add(time.Minute)) || currMinute.Equal(end.Add(time.Minute)) {
+		for currEventIndex < len(events) && events[currEventIndex].Timestamp.Before(currMinute) {
+			fifo.Enqueue(events[currEventIndex])
+			currEventIndex++
+		}
+		fifo.queue = dequeueByTime(currMinute, fifo, window)
+		avg := calculateAvg(fifo)
+		result[currMinute] = output{
+			Date:            currMinute,
+			AvgDeliveryTime: avg,
+		}
+		currMinute = currMinute.Add(time.Minute)
+	}
+	return result
+}
+
+func FIFOSMAMinifiedUsingSlice(events []event, window int32) []output {
+	fifo := NewFIFO()
+	currMinute := getMinute(events[:1][0])
+	end := getMinute(events[len(events)-1:][0])
+	totalMinutes := int(end.Sub(currMinute) + 1)
+	result := make([]output, totalMinutes)
+
+	currEventIndex := 0
+
+	for i := 0; i < totalMinutes; i++ {
+		for currEventIndex < len(events) && events[currEventIndex].Timestamp.Before(currMinute) {
+			fifo.Enqueue(events[currEventIndex])
+			currEventIndex++
+		}
+		fifo.queue = dequeueByTime(currMinute, fifo, window)
+		avg := calculateAvg(fifo)
+		result[i] = output{
+			Date:            currMinute,
+			AvgDeliveryTime: avg,
+		}
+		currMinute = currMinute.Add(time.Minute)
+	}
+	return result
+}
+
 // calculates avg for all elements in FIFO.
-func calculateAvg(fifo FIFO) float32 {
+func calculateAvg(fifo *FIFO) float32 {
 	var sum float32
 	for _, event := range fifo.queue {
 		sum += float32(event.Duration)
@@ -262,14 +337,14 @@ func calculateAvg(fifo FIFO) float32 {
 
 // dequeueByTime is a dequeue process that will happen as long as events inside FIFO
 // have timestamp Xmin 'smaller' then the minute that is being considere.
-func dequeueByTime(currMinute time.Time, fifo FIFO, window int32) []event {
+func dequeueByTime(currMinute time.Time, fifo *FIFO, window int32) []event {
 	// we cant iterate over fifo.queue and remove, so we iterate over a copy.
 	auxQueue := fifo.queue
 	for _, event := range auxQueue {
 		// Remove events from the queue that are older than X minutes from the current minute.
 		if currMinute.Sub(event.Timestamp.Time) > time.Minute*time.Duration(window) {
 			// remove event from queue.
-			fifo.queue = fifo.Dequeue()
+			fifo.Dequeue()
 		}
 	}
 

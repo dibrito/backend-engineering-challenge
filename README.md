@@ -119,3 +119,115 @@ Let's check the results:
 `FIFOSMA-8` is significantly more efficient in terms of **execution time**, **memory usage**, and the **number of allocations** per operation compared to `SMA-8`.
 
 We have a point to use `FIFOSMA`! =D
+
+# Benchmark/Profiling going futher!
+The best way to make your application faster is by improving inefficient code. But how can you tell which code is inefficient?
+You've got to measure it! Go has you covered with the built-in pprof toolset.
+
+Types Of Profiling:
+
+There are five types of profiling: but lets focus on two:
+
+CPU Profile:
+
+* "CPU Profiling is the most common type of profiling, and in general, the one you should start with first. It works by interrupting the program every 10ms and recording the stack trace of currently running goroutines."
+
+Memory:
+
+* "The memory profiler shows the functions that allocate memory to the heap. It can track in use allocations, as well as total allocations that have happened since the program started.
+As a rule, if you want to increase speed, you want to reduce allocated objects, if you want to reduce memory consumption, you want to look at in use objects."
+
+This was taken from a course I did: https://www.gopherguides.com/courses/profiling-optimizing-golang-training
+
+## CPU Profiling
+
+We ran:
+
+go test ./cmd -run=\^\$\$ -bench=^BenchmarkFIFOSMA$$ -cpuprofile=fifocpu.pprof -count=10 > fifocpuprof.bench
+
+then 'top' and 'list' 'FIFOSMA':
+![alt text](./img/image-1.png)
+
+![alt text](./img/image-2.png)
+
+Let created a 'FIFOSMA' without comments to have a better visibility: FIFOSMAMinified
+
+We re-run:
+
+- make benchfifocpuprof
+- pprof fifocpu.pprof
+- list FIFOSMAMinified
+
+![alt text](./img/image-3.png)
+
+It's possible to notice that:
+
+- fifo.Enqueue ~1.66s
+- dequeueByTime ~1.88s
+- and the map assign result[currMinute] ~5.99s
+
+Were taking about seconds CUM time spent.
+CUM is how much time was spent in the function and any internall func calls;
+
+There's a significant amount of time spent in map assignment, our map size is large, let's consider some strategies:
+
+* Preallocate the Map Size
+
+* Use a Slice instead of a Map since we know the minutes are ordered;
+
+Lets compare both approachs, but I got a feeling slice will be better! Slice is the most mechanical sympathetic struct that related to the hardware!
+
+Map result:
+
+Didn't improve much!!
+
+![alt text](./img/image-4.png)
+
+Slice result:
+
+Total Minutes:5997120000000001 is way bigger a slice can support! For 100k entries.
+
+So we will probably stick to the map, lets compare with previous version where we did not set the map size:
+
+![alt text](./img/image-6.png)
+
+Seems weird to have the preatty much no improvement pre-allocating the map. We've must done something wrong!
+
+Let's check cpuprofiling
+
+![alt text](./img/image-7.png)
+
+![alt text](./img/image-8.png)
+
+![alt text](./img/image-9.png)
+
+There's no real significant improve!
+Let's try to mem profiling!
+
+
+## Memory Profiling
+
+![alt text](./img/image-10.png)
+
+There's a  significant memory usage by the append function in Enqueue and again the map assign(We can't get ride of the map, so let's focus on the FIFO).
+Which means that the queue's underlying slice is growing and reallocating frequently, which can lead to high memory consumption.
+
+We could:
+
+- pre-allocate the queue lenght(marking events start index and final index to then count and pre-allocate queue size)
+but pre-allocating size have shown unefficient before, we might need another solution;
+
+But before, let change our current FIFO to use a pointer! and check any improvemts.
+
+![alt text](./img/image-12.png)
+
+We reduced data usage a little bit ~10GB!!
+
+But I'm still not happy! Let's review the SMA concept!
+
+https://en.wikipedia.org/wiki/Moving_average
+
+![alt text](./img/image-11.png)
+
+Use a Circular FIFO can be more memory efficient! Let's give it a try! 
+Let's commit cause we've DONE a lot already!
