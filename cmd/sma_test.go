@@ -124,7 +124,7 @@ func BenchmarkFIFOSMA(b *testing.B) {
 	result = r
 }
 
-func BenchmarkFIFOSMAMapFix(b *testing.B) {
+func BenchmarkBuffFIFOSMA(b *testing.B) {
 	// local sink.
 	var r map[time.Time]output
 	events := generateEventsArray(b, _100K)
@@ -133,7 +133,7 @@ func BenchmarkFIFOSMAMapFix(b *testing.B) {
 	b.ResetTimer()
 	// execute code to benchmark here:
 	for i := 0; i < b.N; i++ {
-		FIFOSMAMinifiedMapFix(events, window)
+		BuffFIFOSMA(events, window)
 	}
 	result = r
 }

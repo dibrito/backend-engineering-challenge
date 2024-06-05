@@ -41,7 +41,9 @@ var rootCmd = &cobra.Command{
 			return ErrParseInputFile
 		}
 
-		result := FIFOSMA(data, window)
+		// result := FIFOSMA(data, window)
+		result := FIFOSMAMinified(data, window)
+		// result := BuffFIFOSMA(data, window)
 		writeOutput(result)
 		return nil
 	},

@@ -272,12 +272,17 @@ func FIFOSMAMinified(events []event, window int32) map[time.Time]output {
 	return result
 }
 
-func FIFOSMAMinifiedMapFix(events []event, window int32) map[time.Time]output {
-	fifo := NewFIFO()
+func BuffFIFOSMA(events []event, window int32) map[time.Time]output {
+	result := make(map[time.Time]output)
 	currMinute := getMinute(events[:1][0])
 	end := getMinute(events[len(events)-1:][0])
-	totalMinutes := int(end.Sub(currMinute) + 1)
-	result := make(map[time.Time]output, totalMinutes)
+	// we might need to start with some capacity!
+	// but never start with ZERO!
+	// maybe with one!(This was my initial tought!! That cause really bad performance!)
+	// fifo := NewBufFIFO(100)
+	// after the cpu and mem profiling we come up with at least half of events!
+	// didn't work! lets try 10% 25% of events!
+	fifo := NewBufFIFO((25 * len(events)) / 100)
 
 	currEventIndex := 0
 
@@ -286,34 +291,10 @@ func FIFOSMAMinifiedMapFix(events []event, window int32) map[time.Time]output {
 			fifo.Enqueue(events[currEventIndex])
 			currEventIndex++
 		}
-		fifo.queue = dequeueByTime(currMinute, fifo, window)
-		avg := calculateAvg(fifo)
+
+		fifo.dequeueBuffFIFOByTime(currMinute, window)
+		avg := calculateAvgFromBuffFIFO(fifo)
 		result[currMinute] = output{
-			Date:            currMinute,
-			AvgDeliveryTime: avg,
-		}
-		currMinute = currMinute.Add(time.Minute)
-	}
-	return result
-}
-
-func FIFOSMAMinifiedUsingSlice(events []event, window int32) []output {
-	fifo := NewFIFO()
-	currMinute := getMinute(events[:1][0])
-	end := getMinute(events[len(events)-1:][0])
-	totalMinutes := int(end.Sub(currMinute) + 1)
-	result := make([]output, totalMinutes)
-
-	currEventIndex := 0
-
-	for i := 0; i < totalMinutes; i++ {
-		for currEventIndex < len(events) && events[currEventIndex].Timestamp.Before(currMinute) {
-			fifo.Enqueue(events[currEventIndex])
-			currEventIndex++
-		}
-		fifo.queue = dequeueByTime(currMinute, fifo, window)
-		avg := calculateAvg(fifo)
-		result[i] = output{
 			Date:            currMinute,
 			AvgDeliveryTime: avg,
 		}
@@ -324,6 +305,18 @@ func FIFOSMAMinifiedUsingSlice(events []event, window int32) []output {
 
 // calculates avg for all elements in FIFO.
 func calculateAvg(fifo *FIFO) float32 {
+	var sum float32
+	for _, event := range fifo.queue {
+		sum += float32(event.Duration)
+	}
+	// avoid division by zero!
+	if len(fifo.queue) > 0 {
+		return (sum) / float32(len(fifo.queue))
+	}
+	return 0
+}
+
+func calculateAvgFromBuffFIFO(fifo *BufFIFO) float32 {
 	var sum float32
 	for _, event := range fifo.queue {
 		sum += float32(event.Duration)
@@ -349,4 +342,16 @@ func dequeueByTime(currMinute time.Time, fifo *FIFO, window int32) []event {
 	}
 
 	return fifo.queue
+}
+
+func (fifo *BufFIFO) dequeueBuffFIFOByTime(currMinute time.Time, window int32) {
+	// we cant iterate over fifo.queue and remove, so we iterate over a copy.
+	auxQueue := fifo.queue
+	for _, event := range auxQueue {
+		// Remove events from the queue that are older than X minutes from the current minute.
+		if currMinute.Sub(event.Timestamp.Time) > time.Minute*time.Duration(window) {
+			// remove event from queue.
+			fifo.Dequeue()
+		}
+	}
 }
