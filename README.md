@@ -75,4 +75,10 @@ TBD
 
 # Benchmark
 
+The whole process of benchmark is described here:
+
 [here](./benchmarksection.md)
+
+Final benchmark:
+
+[here](./finalbenchresults.md)
